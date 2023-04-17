@@ -9,16 +9,16 @@ async fn main() -> Result<(), ()> {
     tokio::spawn(connection);
 
     let link = "dummy0".to_string();
-    println!("dumping address for link \"{link}\"");
+    println!("dumping bond port settings for link \"{link}\"");
 
-    if let Err(e) = dump_addresses(handle, link).await {
+    if let Err(e) = dump_bond_port_settings(handle, link).await {
         eprintln!("{e}");
     }
 
     Ok(())
 }
 
-async fn dump_addresses(handle: Handle, link: String) -> Result<(), Error> {
+async fn dump_bond_port_settings(handle: Handle, link: String) -> Result<(), Error> {
     let mut links = handle.link().get().match_name(link.clone()).execute();
     if let Some(link) = links.try_next().await? {
         let mut addresses = handle
