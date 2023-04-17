@@ -7,10 +7,59 @@ use netlink_packet_core::{
     NetlinkMessage, NLM_F_ACK, NLM_F_CREATE, NLM_F_EXCL, NLM_F_REQUEST,
 };
 use netlink_packet_route::{
-    link::nlas::Nla, LinkMessage, RtnlMessage, IFF_NOARP, IFF_PROMISC, IFF_UP,
+    link::nlas::{Info, InfoBondPort, InfoSlaveData, InfoSlaveKind, Nla},
+    LinkMessage, RtnlMessage, IFF_NOARP, IFF_PROMISC, IFF_UP,
 };
 
 use crate::{try_nl, Error, Handle};
+
+pub struct BondPortSetRequest {
+    request: LinkSetRequest,
+    info_data: Vec<InfoBondPort>,
+}
+
+impl BondPortSetRequest {
+    /// Execute the request.
+    pub async fn execute(self) -> Result<(), Error> {
+        let s = self
+            .request
+            .link_info(InfoSlaveKind::Bond, Some(InfoSlaveData::BondPort(self.info_data)));
+        s.execute().await
+    }
+
+    /// Sets the interface up
+    /// This is equivalent to `ip link set up dev NAME`.
+    pub fn up(mut self) -> Self {
+        self.request = self.request.up();
+        self
+    }
+
+    /// Adds the `queue_id` attribute to the bond port
+    /// This is equivalent to `ip link set name NAME type bond_slave queue_id QUEUE_ID`.
+    pub fn queue_id(mut self, queue_id: u16) -> Self {
+        eprintln!("queue_id starting");
+        self.info_data.push(InfoBondPort::QueueId(queue_id));
+        self
+    }
+
+    /// Adds the `prio` attribute to the bond port
+    /// This is equivalent to `ip link set name NAME type bond_slave prio PRIO`.
+    pub fn prio(mut self, prio: i32) -> Self {
+        eprintln!("prio starting");
+        self.info_data.push(InfoBondPort::Prio(prio));
+        self
+    }
+
+    /// Lookup a link by name
+    ///
+    /// This function requires support from your kernel (>= 2.6.33). If yours is
+    /// older, consider filtering the resulting stream of links.
+    pub fn match_name(mut self, name: String) -> Self {
+        self.request.message.nlas.push(Nla::IfName(name));
+        self
+    }
+
+}
 
 pub struct LinkSetRequest {
     handle: Handle,
@@ -138,5 +187,28 @@ impl LinkSetRequest {
     pub fn setns_by_fd(mut self, fd: RawFd) -> Self {
         self.message.nlas.push(Nla::NetNsFd(fd));
         self
+    }
+    fn link_info(self, kind: InfoSlaveKind, data: Option<InfoSlaveData>) -> Self {
+        let mut link_info_nlas = vec![Info::Kind(kind)];
+        link_info_nlas.push(Info::SlaveKind(kind));
+        if let Some(data) = data {
+            link_info_nlas.push(Info::SlaveData(data));
+        }
+        eprintln!("{:?}", link_info_nlas);
+        self.append_nla(Nla::Info(link_info_nlas))
+    }
+    fn append_nla(mut self, nla: Nla) -> Self {
+        self.message.nlas.push(nla);
+        self
+    }
+    /// Create a new bond.
+    /// This is equivalent to `ip link add link NAME type bond`.
+    pub fn bondport(self, name: String) -> BondPortSetRequest {
+        eprintln!("bondport starting");
+        let s = self.name(name);
+        BondPortSetRequest {
+            request: s,
+            info_data: vec![],
+        }
     }
 }
