@@ -10,7 +10,7 @@ use netlink_packet_route::{
     link::nlas::Nla, LinkMessage, RtnlMessage, IFF_NOARP, IFF_PROMISC, IFF_UP,
 };
 
-use crate::{try_nl, Error, Handle};
+use crate::{try_nl, BondPortSetRequest, Error, Handle};
 
 pub struct LinkSetRequest {
     handle: Handle,
@@ -30,9 +30,15 @@ impl LinkSetRequest {
             mut handle,
             message,
         } = self;
-        let mut req = NetlinkMessage::from(RtnlMessage::SetLink(message));
-        req.header.flags =
-            NLM_F_REQUEST | NLM_F_ACK | NLM_F_EXCL | NLM_F_CREATE;
+
+        let req = if BondPortSetRequest::is_bond_port(&message) {
+            BondPortSetRequest::generate_netlink_message(message)
+        } else {
+            let mut req = NetlinkMessage::from(RtnlMessage::SetLink(message));
+            req.header.flags =
+                NLM_F_REQUEST | NLM_F_ACK | NLM_F_EXCL | NLM_F_CREATE;
+            req
+        };
 
         let mut response = handle.request(req)?;
         while let Some(message) = response.next().await {
@@ -138,5 +144,12 @@ impl LinkSetRequest {
     pub fn setns_by_fd(mut self, fd: RawFd) -> Self {
         self.message.nlas.push(Nla::NetNsFd(fd));
         self
+    }
+
+    pub fn bond_port(self) -> BondPortSetRequest {
+        BondPortSetRequest {
+            request: self,
+            info_port_data: vec![],
+        }
     }
 }
