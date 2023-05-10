@@ -15,7 +15,7 @@ use crate::{try_nl, Error, Handle};
 
 pub struct BondPortSetRequest {
     request: LinkSetRequest,
-    info_data: Vec<InfoBondPort>,
+    info_slave_data: Vec<InfoBondPort>,
 }
 
 impl BondPortSetRequest {
@@ -23,7 +23,7 @@ impl BondPortSetRequest {
     pub async fn execute(self) -> Result<(), Error> {
         let s = self
             .request
-            .link_info(InfoSlaveKind::Bond, Some(InfoSlaveData::BondPort(self.info_data)));
+            .link_info(InfoSlaveKind::Bond, Some(InfoSlaveData::BondPort(self.info_slave_data)));
         s.execute().await
     }
 
@@ -38,7 +38,7 @@ impl BondPortSetRequest {
     /// This is equivalent to `ip link set name NAME type bond_slave queue_id QUEUE_ID`.
     pub fn queue_id(mut self, queue_id: u16) -> Self {
         eprintln!("queue_id starting");
-        self.info_data.push(InfoBondPort::QueueId(queue_id));
+        self.info_slave_data.push(InfoBondPort::QueueId(queue_id));
         self
     }
 
@@ -46,13 +46,13 @@ impl BondPortSetRequest {
     /// This is equivalent to `ip link set name NAME type bond_slave prio PRIO`.
     pub fn prio(mut self, prio: i32) -> Self {
         eprintln!("prio starting");
-        self.info_data.push(InfoBondPort::Prio(prio));
+        self.info_slave_data.push(InfoBondPort::Prio(prio));
         self
     }
 
     pub fn linkfailurecount(mut self, linkfailurecount: u32) -> Self {
         eprintln!("linkfailurecount starting");
-        self.info_data.push(InfoBondPort::LinkFailureCount(linkfailurecount));
+        self.info_slave_data.push(InfoBondPort::LinkFailureCount(linkfailurecount));
         self
     }
 
@@ -84,6 +84,8 @@ impl LinkSetRequest {
             mut handle,
             message,
         } = self;
+        eprintln!("******link total message*******");
+        eprintln!("{:?}", message);
         let mut req = NetlinkMessage::from(RtnlMessage::SetLink(message));
         req.header.flags =
             NLM_F_REQUEST | NLM_F_ACK | NLM_F_EXCL | NLM_F_CREATE;
@@ -193,18 +195,6 @@ impl LinkSetRequest {
         self.message.nlas.push(Nla::NetNsFd(fd));
         self
     }
-    fn link_info(self, kind: InfoSlaveKind, data: Option<InfoSlaveData>) -> Self {
-        let mut link_info_nlas = vec![Info::SlaveKind(kind)];
-        if let Some(data) = data {
-            link_info_nlas.push(Info::SlaveData(data));
-        }
-        eprintln!("{:?}", link_info_nlas);
-        self.append_nla(Nla::Info(link_info_nlas))
-    }
-    fn append_nla(mut self, nla: Nla) -> Self {
-        self.message.nlas.push(nla);
-        self
-    }
     /// Create a new bond.
     /// This is equivalent to `ip link add link NAME type bond`.
     pub fn bondport(self, name: String) -> BondPortSetRequest {
@@ -212,7 +202,24 @@ impl LinkSetRequest {
         let s = self.name(name);
         BondPortSetRequest {
             request: s,
-            info_data: vec![],
+            info_slave_data: vec![],
         }
     }
+    fn link_info(self, slavekind: InfoSlaveKind, slavedata: Option<InfoSlaveData>) -> Self {
+        let mut link_info_nlas = vec![Info::SlaveKind(slavekind)];
+        if let Some(slavedata) = slavedata {
+            link_info_nlas.push(Info::SlaveData(slavedata));
+        }
+        eprintln!("{:?}", link_info_nlas);
+        self.append_nla(Nla::Info(link_info_nlas))
+    }
+    fn append_nla(mut self, nla: Nla) -> Self {
+        eprintln!("******append_nla*******");
+        eprintln!("{:?}", nla);
+        self.message.nlas.push(nla);
+        eprintln!("******message_nlas*******");
+        eprintln!("{:?}", self.message.nlas);
+        self
+    }
+
 }
