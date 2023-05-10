@@ -23,6 +23,8 @@ impl Handle {
         &mut self,
         message: NetlinkMessage<RtnlMessage>,
     ) -> Result<impl Stream<Item = NetlinkMessage<RtnlMessage>>, Error> {
+        eprintln!("******inside handle, netlink msg: *******");
+        eprintln!("{:?}", message);
         self.0
             .request(message, SocketAddr::new(0, 0))
             .map_err(|_| Error::RequestFailed)

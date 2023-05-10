@@ -539,11 +539,15 @@ impl LinkAddRequest {
             message,
             replace,
         } = self;
+        eprintln!("******bond replace bool: *******");
+        eprintln!("{:?}", replace);
         let mut req = NetlinkMessage::from(RtnlMessage::NewLink(message));
         let replace = if replace { NLM_F_REPLACE } else { NLM_F_EXCL };
         req.header.flags = NLM_F_REQUEST | NLM_F_ACK | replace | NLM_F_CREATE;
 
         let mut response = handle.request(req)?;
+        eprintln!("******bond response: *******");
+        // eprintln!("{:?}", response);
         while let Some(message) = response.next().await {
             try_nl!(message);
         }

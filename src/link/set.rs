@@ -4,7 +4,8 @@ use std::os::unix::io::RawFd;
 
 use futures::stream::StreamExt;
 use netlink_packet_core::{
-    NetlinkMessage, NLM_F_ACK, NLM_F_CREATE, NLM_F_EXCL, NLM_F_REQUEST,
+    NetlinkMessage, NLM_F_ACK, NLM_F_CREATE, NLM_F_EXCL, NLM_F_REPLACE,
+    NLM_F_REQUEST,
 };
 use netlink_packet_route::{
     link::nlas::{Info, InfoBondPort, InfoSlaveData, InfoSlaveKind, Nla},
@@ -69,13 +70,14 @@ impl BondPortSetRequest {
 pub struct LinkSetRequest {
     handle: Handle,
     message: LinkMessage,
+    replace: bool,
 }
 
 impl LinkSetRequest {
     pub(crate) fn new(handle: Handle, index: u32) -> Self {
         let mut message = LinkMessage::default();
         message.header.index = index;
-        LinkSetRequest { handle, message }
+        LinkSetRequest { handle, message,  replace: false}
     }
 
     /// Execute the request
@@ -83,14 +85,20 @@ impl LinkSetRequest {
         let LinkSetRequest {
             mut handle,
             message,
+            replace,
         } = self;
+        eprintln!("******bond port replace bool*******");
+        eprintln!("{:?}", replace);
         eprintln!("******link total message*******");
         eprintln!("{:?}", message);
         let mut req = NetlinkMessage::from(RtnlMessage::SetLink(message));
+        let replace: u16 = if replace { NLM_F_REPLACE } else { NLM_F_EXCL };
         req.header.flags =
-            NLM_F_REQUEST | NLM_F_ACK | NLM_F_EXCL | NLM_F_CREATE;
+            NLM_F_REQUEST | NLM_F_ACK | replace | NLM_F_EXCL | NLM_F_CREATE;
 
         let mut response = handle.request(req)?;
+        eprintln!("******bond port response: *******");
+        // eprintln!("{:?}", response);
         while let Some(message) = response.next().await {
             try_nl!(message);
         }
@@ -205,6 +213,15 @@ impl LinkSetRequest {
             info_slave_data: vec![],
         }
     }
+
+    /// Replace existing matching link.
+    pub fn replace(self) -> Self {
+        Self {
+            replace: true,
+            ..self
+        }
+    }
+
     fn link_info(self, slavekind: InfoSlaveKind, slavedata: Option<InfoSlaveData>) -> Self {
         let mut link_info_nlas = vec![Info::SlaveKind(slavekind)];
         if let Some(slavedata) = slavedata {
