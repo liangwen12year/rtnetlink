@@ -77,7 +77,7 @@ impl LinkSetRequest {
     pub(crate) fn new(handle: Handle, index: u32) -> Self {
         let mut message = LinkMessage::default();
         message.header.index = index;
-        LinkSetRequest { handle, message,  replace: false}
+        LinkSetRequest { handle, message:LinkMessage::default(), replace: false}
     }
 
     /// Execute the request
@@ -91,7 +91,7 @@ impl LinkSetRequest {
         eprintln!("{:?}", replace);
         eprintln!("******link total message*******");
         eprintln!("{:?}", message);
-        let mut req = NetlinkMessage::from(RtnlMessage::SetLink(message));
+        let mut req = NetlinkMessage::from(RtnlMessage::NewLink(message));
         let replace: u16 = if replace { NLM_F_REPLACE } else { NLM_F_EXCL };
         req.header.flags =
             NLM_F_REQUEST | NLM_F_ACK | replace | NLM_F_EXCL | NLM_F_CREATE;
