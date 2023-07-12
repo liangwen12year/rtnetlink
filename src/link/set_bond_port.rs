@@ -16,7 +16,7 @@ pub struct BondPortSetRequest {
 impl BondPortSetRequest {
     /// Execute the request.
     pub async fn execute(mut self) -> Result<(), Error> {
-        let _s = self.port_link_info(
+        self.port_link_info(
             InfoPortKind::Bond,
             Some(InfoPortData::BondPort(self.info_port_data.clone())),
         );
@@ -68,7 +68,7 @@ impl BondPortSetRequest {
         &mut self,
         portkind: InfoPortKind,
         portdata: Option<InfoPortData>,
-    ) -> &mut Self {
+    ) {
         let mut link_info_nlas = vec![Info::PortKind(portkind)];
         if let Some(portdata) = portdata {
             link_info_nlas.push(Info::PortData(portdata));
@@ -77,6 +77,5 @@ impl BondPortSetRequest {
             .message_mut()
             .nlas
             .push(Nla::Info(link_info_nlas));
-        self
     }
 }
